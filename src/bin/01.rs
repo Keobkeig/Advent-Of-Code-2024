@@ -22,8 +22,8 @@ pub fn part_two(input: &str) -> Option<u32> {
 
     let mut hm: HashMap<i32, usize> = HashMap::new();
 
-    for num2 in list2.iter() {
-        *hm.entry(*num2).or_insert(0) += 1;
+    for &num2 in list2.iter() {
+        *hm.entry(num2).or_insert(0) += 1;
     }
 
     for num1 in list1.iter() {
