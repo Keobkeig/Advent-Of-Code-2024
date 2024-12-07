@@ -1,218 +1,137 @@
+use std::collections::HashSet;
+
 advent_of_code::solution!(6);
 
-#[derive(Default, Clone)]
-enum Dir {
-    #[default]
-    Up,
-    Down,
-    Left,
-    Right,
+fn parse_input(input: &str) -> (Vec<Vec<char>>, (i32, i32)) {
+    let mut matrix: Vec<Vec<char>> = Vec::new();
+    let mut start: (i32, i32) = (0, 0);
+
+    for (i, line) in input.lines().enumerate() {
+        let row: Vec<char> = line.chars().collect();
+        for (j, &ch) in row.iter().enumerate() {
+            if ch == '^' {
+                start = (i as i32, j as i32);
+            }
+        }
+        matrix.push(row);
+    }
+
+    (matrix, start)
 }
 
-impl Dir {
-    fn turn_right(&mut self) {
-        *self = match self {
-            Dir::Up => Dir::Right,
-            Dir::Right => Dir::Down,
-            Dir::Down => Dir::Left,
-            Dir::Left => Dir::Up,
-        };
-    }
-    fn clone(&self) -> Self {
-        match self {
-            Dir::Up => Dir::Up,
-            Dir::Down => Dir::Down,
-            Dir::Left => Dir::Left,
-            Dir::Right => Dir::Right,
-        }
-    }
-}
+fn move_direction(
+    matrix: &mut Vec<Vec<char>>,
+    pos: (i32, i32),
+    dir: (i32, i32),
+) -> ((i32, i32), i32, bool, Vec<(i32, i32)>) {
+    let mut move_count = 0;
+    let mut new_pos = pos.clone();
+    let rows = matrix.len() as i32;
+    let cols = matrix[0].len() as i32;
+    // For part two, register all possible pos for an obstacle
+    let mut possible_obstacles: Vec<(i32, i32)> = Vec::new();
 
-#[derive(Default, Clone)]
-struct Position {
-    y: i32,
-    x: i32,
-    dir: Dir,
-}
+    loop {
+        let old_pos = new_pos.clone();
+        new_pos = (old_pos.0 + dir.0, old_pos.1 + dir.1);
 
-impl Position {
-    fn new(y: i32, x: i32) -> Self {
-        Self { y, x, dir: Dir::Up }
-    }
-
-    fn neww(y: i32, x: i32, dir: Dir) -> Self {
-        Self { y, x, dir }
-    }
-    fn turn_right(&mut self) {
-        self.dir.turn_right();
-    }
-    fn move_forward(&mut self) {
-        match self.dir {
-            Dir::Up => self.y -= 1,
-            Dir::Down => self.y += 1,
-            Dir::Left => self.x -= 1,
-            Dir::Right => self.x += 1,
-        }
-    }
-    fn clone(&self) -> Self {
-        Self {
-            y: self.y,
-            x: self.x,
-            dir: self.dir.clone(),
-        }
-    }
-    fn step(&mut self, reverse: bool) {
-        match self.dir {
-            Dir::Up => {
-                if !reverse {
-                    self.y -= 1
-                } else {
-                    self.y += 1
-                }
-            }
-            Dir::Right => {
-                if !reverse {
-                    self.x += 1
-                } else {
-                    self.x -= 1
-                }
-            }
-            Dir::Down => {
-                if !reverse {
-                    self.y += 1
-                } else {
-                    self.y -= 1
-                }
-            }
-            Dir::Left => {
-                if !reverse {
-                    self.x -= 1
-                } else {
-                    self.x += 1
-                }
+        if !(new_pos.0 >= 0 && new_pos.0 < rows && new_pos.1 >= 0 && new_pos.1 < cols) {
+            return (
+                (new_pos.0, new_pos.1),
+                move_count,
+                false,
+                possible_obstacles,
+            );
+        } else {
+            let value = matrix[new_pos.0 as usize][new_pos.1 as usize];
+            if value == '#' {
+                return (old_pos, move_count, true, possible_obstacles);
+            } else if value != 'X' {
+                possible_obstacles.push(new_pos);
+                move_count = move_count + 1;
+                matrix[new_pos.0 as usize][new_pos.1 as usize] = 'X';
             }
         }
     }
 }
 
 pub fn part_one(input: &str) -> Option<u32> {
-    let grid: Vec<Vec<char>> = input.lines().map(|line| line.chars().collect()).collect();
+    let (mut matrix, pos) = parse_input(input);
+    let mut count = 0;
 
-    let mut pos = grid
-        .iter()
-        .enumerate()
-        .find_map(|(y, row)| {
-            row.iter()
-                .position(|&c| c == '^' || c == 'v' || c == '<' || c == '>')
-                .map(|x| Position::new(y as i32, x as i32))
-        })
-        .expect("No guard found");
+    // Directions UP, RIGHT, DOWN, LEFT
+    let dirs: Vec<(i32, i32)> = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
 
-    let mut visited = std::collections::HashSet::new();
-    visited.insert((pos.x, pos.y));
-
+    let mut current_dir = 0;
+    let mut current_pos = pos.clone();
     loop {
-        let (n_y, n_x) = match pos.dir {
-            Dir::Up => (pos.y - 1, pos.x),
-            Dir::Down => (pos.y + 1, pos.x),
-            Dir::Left => (pos.y, pos.x - 1),
-            Dir::Right => (pos.y, pos.x + 1),
-        };
+        let result = move_direction(&mut matrix, current_pos, dirs[current_dir]);
 
-        //bound check
-        if n_y < 0 || n_x < 0 || n_y >= grid.len() as i32 || n_x >= grid[0].len() as i32 {
+        current_dir = (current_dir + 1) % dirs.len();
+        current_pos = result.0;
+        count = count + result.1;
+
+        if !result.2 {
             break;
         }
+    }
+    Some((count + 1) as u32)
+}
 
-        //turn if wall
-        if grid[n_y as usize][n_x as usize] == '#' {
-            pos.turn_right();
-            continue;
-        } else {
-            pos.move_forward();
-            visited.insert((pos.x, pos.y));
+fn find_infinite_loops(matrix: &mut Vec<Vec<char>>, pos: (i32, i32), obs: (i32, i32)) -> bool {
+    let dirs: Vec<(i32, i32)> = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
+
+    let mut clone = matrix.clone();
+    clone[obs.0 as usize][obs.1 as usize] = '#';
+
+    let mut current_dir = 0;
+    let mut current_pos = pos.clone();
+
+    let mut operations: HashSet<((i32, i32), (i32, i32))> = HashSet::new();
+
+    loop {
+        if operations.contains(&(current_pos, dirs[current_dir])) {
+            return true;
+        }
+        operations.insert((current_pos, dirs[current_dir]));
+
+        let result = move_direction(&mut clone, current_pos, dirs[current_dir]);
+        current_dir = (current_dir + 1) % dirs.len();
+        current_pos = result.0;
+
+        if !result.2 {
+            return false;
         }
     }
-    Some(visited.len() as u32)
 }
 
 pub fn part_two(input: &str) -> Option<u32> {
-    let mut grid: Vec<Vec<char>> = input.lines().map(|line| line.chars().collect()).collect();
+    let (mut matrix, pos) = parse_input(input);
 
-    let pos = grid
-        .iter()
-        .enumerate()
-        .find_map(|(y, row)| {
-            row.iter().enumerate().find_map(|(x, &c)| match c {
-                '^' => Some(Position::neww(y as i32, x as i32, Dir::Up)),
-                'v' => Some(Position::neww(y as i32, x as i32, Dir::Down)),
-                '<' => Some(Position::neww(y as i32, x as i32, Dir::Left)),
-                '>' => Some(Position::neww(y as i32, x as i32, Dir::Right)),
-                _ => None,
-            })
-        })
-        .expect("No guard found");
+    let dirs: Vec<(i32, i32)> = vec![(-1, 0), (0, 1), (1, 0), (0, -1)];
+    let mut possible_blocs: Vec<(i32, i32)> = Vec::new();
 
-    // Mark reachable tiles
-    let mut marked_grid = grid.clone();
-    mark_reachable(&mut marked_grid, pos.clone());
+    let mut current_dir = 0;
+    let mut current_pos = pos.clone();
+    loop {
+        let result = move_direction(&mut matrix, current_pos, dirs[current_dir]);
+        current_dir = (current_dir + 1) % dirs.len();
+        possible_blocs.extend(result.3);
+        current_pos = result.0;
 
-    let mut possible_positions = 0;
-
-    for y in 0..grid.len() {
-        for x in 0..grid[0].len() {
-            if marked_grid[y][x] == 'X' {
-                grid[y][x] = '#';
-                if walk(&grid, pos.clone()) {
-                    possible_positions += 1;
-                }
-                grid[y][x] = '.';
-            }
-        }
-    }
-
-    Some(possible_positions)
-}
-
-fn mark_reachable(grid: &mut Vec<Vec<char>>, mut pos: Position) {
-    while pos.y >= 0 && pos.y < grid.len() as i32 && pos.x >= 0 && pos.x < grid[0].len() as i32 {
-        if grid[pos.y as usize][pos.x as usize] == '#' {
-            pos.step(true);
-            pos.turn_right();
-        } else if grid[pos.y as usize][pos.x as usize] != 'X' {
-            grid[pos.y as usize][pos.x as usize] = 'X';
-            pos.step(false);
-        } else {
+        if !result.2 {
             break;
         }
     }
-}
 
-fn walk(grid: &Vec<Vec<char>>, mut pos: Position) -> bool {
     let mut count = 0;
-    let mut visited = std::collections::HashSet::new();
-
-    while pos.y >= 0 && pos.y < grid.len() as i32 && pos.x >= 0 && pos.x < grid[0].len() as i32 {
-        if grid[pos.y as usize][pos.x as usize] == '#' {
-            pos.step(true);
-            pos.turn_right();
+    for possible_bloc_pos in possible_blocs.iter() {
+        if find_infinite_loops(&mut matrix, pos, *possible_bloc_pos) {
+            count = count + 1;
         }
-
-        if visited.contains(&(pos.y, pos.x)) {
-            return true;
-        }
-
-        visited.insert((pos.y, pos.x));
-        count += 1;
-
-        if count > visited.len() * 2 {
-            return false;
-        }
-
-        pos.step(false);
     }
 
-    false
+    Some(count)
 }
 
 #[cfg(test)]
@@ -222,12 +141,12 @@ mod tests {
     #[test]
     fn test_part_one() {
         let result = part_one(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(42));
     }
 
     #[test]
     fn test_part_two() {
         let result = part_two(&advent_of_code::template::read_file("examples", DAY));
-        assert_eq!(result, None);
+        assert_eq!(result, Some(6));
     }
 }
