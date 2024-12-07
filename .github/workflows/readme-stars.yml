@@ -16,9 +16,9 @@ jobs:
             - uses: actions/checkout@v4
             - uses: k2bd/advent-readme-stars@v1
               with:
-                  userId: ${{ secrets.AOC_USER_ID }}
-                  sessionCookie: ${{ secrets.AOC_SESSION }}
-                  year: ${{ secrets.AOC_YEAR }}
+                  userId: ${{ 551247 }}
+                  sessionCookie: ${{ 53616c7465645f5f5986ee6a34fc8c6cd17a90094537dadf83561e890e0ea6ecd5f48a2cd44fe9b93b1ad81f4e8f8c46e67b9b161d62a7c20fe26bf245bd1df9}
+                  year: ${{ 2024 }}
             - uses: stefanzweifel/git-auto-commit-action@v5
               with:
                   commit_message: "update readme progress"
